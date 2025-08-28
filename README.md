@@ -5,3 +5,5 @@ Atomic Configuration Analysis is a Python script that will parse a VASP input PO
   
   -- Analyzes set number of closest neighboring atoms which can be set to any number of neighbors defined in init as self.number_of_neighbors = # 
       *Note: Will need to set classifications manually if changing number of neighboring atoms to analyze. 
+
+Only aca.py needed to run analysis tool. Other files are for archival purposes only. 
