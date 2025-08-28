@@ -3,7 +3,7 @@ Atomic Configuration Analysis is a Python script that will parse a VASP input PO
 
 **Configure Settings in main before running code**
 
-  -- poscar = "/jet/home/mohammes/projects/atomic_site_analysis/POSCAR_structures/POSCAR-R1"
+  -- poscar = "home/FILEPATH/POSCAR"
   
   -- CORE_ATOM = 'Te'
   
