@@ -304,7 +304,7 @@ class AtomicConfigurationAnalysis:
 if __name__ == "__main__":
     
     ## Configuration Settings ##
-    poscar = "/jet/home/mohammes/projects/atomic_site_analysis/POSCAR_structures/POSCAR-R1"
+    poscar = "home/FILEPATH/POSCAR"
     CORE_ATOM = 'Te'
     NUM_NEIGH = 6
     STRUC_TYPE = 'octahedral'
@@ -374,4 +374,5 @@ if __name__ == "__main__":
     if Sb_bonds:
         Sb_bonds_mean = np.mean(Sb_bonds)
         Sb_bonds_std = np.std(Sb_bonds)
+
         print(f"  Overall Sb: mean = {Sb_bonds_mean:.4f} A, std = {Sb_bonds_std:.4f} A")
