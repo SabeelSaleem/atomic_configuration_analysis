@@ -3,7 +3,8 @@ Atomic Configuration Analysis is a Python script that will parse a VASP input PO
 
   -- POSCAR Path must be defined and Core atom must be chosen within structure to search for neighbors. Defined at Configuration Settings in main. 
   
-  -- Analyzes set number of closest neighboring atoms which can be set to any number of neighbors defined in init as self.number_of_neighbors = # 
+  -- Analyzes set number of closest neighboring atoms which can be set to any number defined in init as self.number_of_neighbors = 6 
+      
       *Note: Will need to set classifications manually if changing number of neighboring atoms to analyze. 
 
 Only aca.py needed to run analysis tool. Other files are for archival purposes only. 
