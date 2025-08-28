@@ -20,13 +20,14 @@ class AtomicConfigurationAnalysis:
         self.atom_counts_dict = None
         self.atomic_frac_positions = None
         self.cells = {}
-        self.number_of_neighbors = 6
+        self.number_of_neighbors = None
+        self.analysis_type = None
         self.bond_length_analysis = {}
         self.bond_angle_analysis = {}
         self.all_atoms_list = []
         self.neighbor_ratio_analysis = {}
         self.environment_class_analysis = {}
-        self.classifications = {
+        self.octahedral_classifications = {
             "6Ag0Sb": '6Ag-0Sb',
             "5Ag1Sb": '5Ag-1Sb',
             "4Ag2SbAdj": '4Ag-2Sb_Adjacent',
@@ -38,6 +39,7 @@ class AtomicConfigurationAnalysis:
             "1Ag5Sb": '1Ag-5Sb',
             "0Ag6Sb": '0Ag-6Sb',
         }
+        self.classifications = {}
 
     @staticmethod
     def atom(atom_type, index, cell='cell_0_0_0'):
@@ -136,7 +138,7 @@ class AtomicConfigurationAnalysis:
             
             distances.sort(key=lambda x: x['bond_length'])
             analysis_key = f"{atom_type}_{i}"
-            self.bond_length_analysis[analysis_key] = distances[:{self.number_of_neighbors}]
+            self.bond_length_analysis[analysis_key] = distances[:self.number_of_neighbors]
         print(f"Bond length analysis for {atom_type} has been stored.")
 
     def bond_angles_for_type(self, atom_type):
@@ -182,8 +184,8 @@ class AtomicConfigurationAnalysis:
 
     def analyze_neighbor_ratios(self, atom_type):
         """
-        Analyzes neighbor composition for all atoms of a specified type. It stores both simple counts 
-        and a detailed geometric classification.
+        Analyzes neighbor composition. If number_of_neighbors is 6, it also
+        performs a detailed octahedral geometric classification for Ag/Sb environments.
         """
         if atom_type not in self.atom_counts_dict:
             print(f"Error: Atom type '{atom_type}' not found in structure.")
@@ -191,6 +193,10 @@ class AtomicConfigurationAnalysis:
             
         count = self.atom_counts_dict[atom_type]
         print(f"\n--- Running neighbor analysis for all {count} '{atom_type}' atoms ---")
+        
+        if self.analysis_type == 'octahedral':
+            self.classifications = self.octahedral_classifications.copy()
+        
         for i in range(count):
             analysis_key = f"{atom_type}_{i}"
             if analysis_key not in self.bond_length_analysis:
@@ -199,44 +205,21 @@ class AtomicConfigurationAnalysis:
 
             central_coords = self.cells['cell_0_0_0'][atom_type][i]
             neighbors = self.bond_length_analysis[analysis_key]
-            
+
             neighbor_types = [n['type'] for n in neighbors]
             self.neighbor_ratio_analysis[analysis_key] = dict(Counter(neighbor_types))
-
-            ag_neighbors = [n for n in neighbors if n['type'] == 'Ag']
-            sb_neighbors = [n for n in neighbors if n['type'] == 'Sb']
-            num_ag = len(ag_neighbors)
-            env_class = "Unknown"
-
+            
             def get_angle(v1, v2):
                 mag1 = np.linalg.norm(v1)
                 mag2 = np.linalg.norm(v2)
                 if mag1 == 0 or mag2 == 0: return 0.0
                 cos_angle = np.clip(np.dot(v1, v2) / (mag1 * mag2), -1.0, 1.0)
                 return np.degrees(np.arccos(cos_angle))
-
-            if num_ag <= 1 or num_ag >= 5:
-                env_class = f"{num_ag}Ag-{6-num_ag}Sb"
-            elif num_ag == 2:
-                v1 = ag_neighbors[0]['coords'] - central_coords
-                v2 = ag_neighbors[1]['coords'] - central_coords
-                angle = get_angle(v1, v2)
-                env_class = "2Ag-4Sb_Opposite" if angle > 150 else "2Ag-4Sb_Adjacent"
-            elif num_ag == 4:
-                v1 = sb_neighbors[0]['coords'] - central_coords
-                v2 = sb_neighbors[1]['coords'] - central_coords
-                angle = get_angle(v1, v2)
-                env_class = "4Ag-2Sb_Opposite" if angle > 150 else "4Ag-2Sb_Adjacent"
-            elif num_ag == 3:
-                coords = [n['coords'] for n in ag_neighbors]
-                vectors = [c - central_coords for c in coords]
-                angles = [get_angle(vectors[0], vectors[1]), get_angle(vectors[0], vectors[2]), get_angle(vectors[1], vectors[2])]
-                if any(a > 150 for a in angles):
-                    env_class = "3Ag-3Sb_Line"
-                else:
-                    env_class = "3Ag-3Sb_Cluster"
             
-            self.environment_class_analysis[analysis_key] = env_class
+            if self.analysis_type == 'octahedral':
+                env_class = self._classify_octahedral_ag_sb(neighbors, central_coords)
+                self.environment_class_analysis[analysis_key] = env_class
+                
         print(f"Neighbor analysis for {atom_type} has been stored.")
 
     def get_bond_length(self, atom1, atom2):
@@ -279,14 +262,56 @@ class AtomicConfigurationAnalysis:
         
         return float(np.degrees(angle_rad))
 
+    """
+    Internal Classification Code for Various Structures (Work In Progress)
+    """
+    def _classify_octahedral_ag_sb(self, neighbors, central_coords):
+        """
+        Helper function to classify an octahedral environment with Ag and Sb neighbors.
+        """
+        ag_neighbors = [n for n in neighbors if n['type'] == 'Ag']
+        sb_neighbors = [n for n in neighbors if n['type'] == 'Sb']
+        num_ag = len(ag_neighbors)
+        if num_ag == 6: return '6Ag-0Sb'
+        if num_ag == 5: return '5Ag-1Sb'
+        if num_ag == 1: return '1Ag-5Sb'
+        if num_ag == 0: return '0Ag-6Sb'
+        def get_angle(v1, v2):
+            mag1 = np.linalg.norm(v1)
+            mag2 = np.linalg.norm(v2)
+            if mag1 == 0 or mag2 == 0: return 0.0
+            cos_angle = np.clip(np.dot(v1, v2) / (mag1 * mag2), -1.0, 1.0)
+            return np.degrees(np.arccos(cos_angle))
+        if num_ag == 2:
+            v1 = ag_neighbors[0]['coords'] - central_coords
+            v2 = ag_neighbors[1]['coords'] - central_coords
+            angle = get_angle(v1, v2)
+            return "2Ag-4Sb_Opposite" if angle > 150 else "2Ag-4Sb_Adjacent"
+        if num_ag == 4:
+            v1 = sb_neighbors[0]['coords'] - central_coords
+            v2 = sb_neighbors[1]['coords'] - central_coords
+            angle = get_angle(v1, v2)
+            return "4Ag-2Sb_Opposite" if angle > 150 else "4Ag-2Sb_Adjacent"
+        if num_ag == 3:
+            coords = [n['coords'] for n in ag_neighbors]
+            vectors = [c - central_coords for c in coords]
+            angles = [get_angle(vectors[0], vectors[1]), get_angle(vectors[0], vectors[2]), get_angle(vectors[1], vectors[2])]
+            return "3Ag-3Sb_Line" if any(a > 150 for a in angles) else "3Ag-3Sb_Cluster"
+        return "Unknown"
+    
+
 
 if __name__ == "__main__":
     
     ## Configuration Settings ##
     poscar = "/jet/home/mohammes/projects/atomic_site_analysis/POSCAR_structures/POSCAR-R1"
     CORE_ATOM = 'Te'
-
+    NUM_NEIGH = 6
+    STRUC_TYPE = 'octahedral'
+    
     analysis = AtomicConfigurationAnalysis()
+    analysis.number_of_neighbors = NUM_NEIGH
+    analysis.analysis_type = STRUC_TYPE
     analysis.parse_poscar(poscar)
     analysis.generate_cells()
     analysis.bond_lengths_for_type(CORE_ATOM)
@@ -301,7 +326,6 @@ if __name__ == "__main__":
             key for key, value in analysis.environment_class_analysis.items()
             if value == full_name
         ]
-        
         bl_Ag = [
             n['bond_length'] for key in atom_keys_in_class
             for n in analysis.bond_length_analysis[key] if n['type'] == 'Ag'
@@ -310,7 +334,6 @@ if __name__ == "__main__":
             n['bond_length'] for key in atom_keys_in_class
             for n in analysis.bond_length_analysis[key] if n['type'] == 'Sb'
         ]
-        
         statistics_by_class[full_name] = {
             'Ag_mean': np.mean(bl_Ag) if bl_Ag else None,
             'Ag_std': np.std(bl_Ag) if bl_Ag else None,
